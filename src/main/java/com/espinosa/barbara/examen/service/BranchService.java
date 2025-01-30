@@ -7,33 +7,93 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.espinosa.barbara.examen.exception.NotFoundException;
 import com.espinosa.barbara.examen.model.Branch;
+import com.espinosa.barbara.examen.model.BranchHoliday;
+import com.espinosa.barbara.examen.repository.BranchRepository;
 
 @Service
 public class BranchService {
 
-    public List<Branch> findAll() {
-        List<Branch> branches = new ArrayList<>();
-        Branch br = new Branch();
-        br.setId("1");
-        br.setEmailAdress("sucursaluno@gmail.com");
-        br.setName("Sucursal Uno");
-        br.setPhoneNumber("26663006");
-        br.setState("Active");
-        br.setCreationDate(LocalDateTime.now().minusYears(1));
-        br.setLastModifiedDate(LocalDateTime.now()); 
+    private final BranchRepository repository;
 
-        List<Branch.BranchHoliday> holidays = new ArrayList<>();
-        Branch.BranchHoliday holiday = new Branch.BranchHoliday();
-        holiday.setDate(LocalDate.of(2024, 12, 25));
-        holiday.setName("Christmas");
-        holidays.add(holiday);
-
-        br.setBranchHolidays(holidays); 
-        branches.add(br);
-
-        return branches;
-
+    public BranchService(BranchRepository repository) {
+        this.repository = repository;
     }
 
+    public List<Branch> findAll() {
+        return repository.findAll();
+    }
+
+    public Branch findById(String id) {
+        
+        Branch branch = repository.findById(id).orElse(null);
+        if (branch == null) {
+            throw new NotFoundException(id, "Branch");
+        } else {
+            return branch;
+        }
+    }
+
+    public Branch create(Branch branch) {
+        branch.setCreationDate(LocalDateTime.now());
+        branch.setLastModifiedDate(LocalDateTime.now());
+        return repository.save(branch);
+    }
+
+    public Branch update(String id, Branch branch) {
+        Branch branchDB = this.findById(id);
+        if (branchDB == null) {
+            return null;
+        }
+        branch.setId(id);
+        branch.setLastModifiedDate(LocalDateTime.now());
+        return repository.save(branch);
+    }
+
+    public List<BranchHoliday> findHolidays(String id) {
+        Branch branch = this.findById(id);
+        if (branch == null) {
+            throw new NotFoundException(id, "Branch Holiday");
+        }else{
+            return branch.getBranchHolidays();
+        }
+        
+    }
+
+    public BranchHoliday createHoliday(String id, BranchHoliday holiday) {
+        Branch branch = this.findById(id);
+        if (branch == null) {
+            return null;
+        }
+        if (branch.getBranchHolidays() == null) {
+            branch.setBranchHolidays(new ArrayList<>());
+        }
+        branch.getBranchHolidays().add(holiday);
+        branch.setLastModifiedDate(LocalDateTime.now());
+        repository.save(branch);
+        return holiday;
+    }
+
+    public void deleteHoliday(String id, BranchHoliday holiday) {
+        Branch branch = this.findById(id);
+        if (branch != null && branch.getBranchHolidays() != null) {
+            branch.getBranchHolidays().removeIf(h -> 
+                h.getDate().equals(holiday.getDate()) && 
+                h.getName().equals(holiday.getName()));
+            branch.setLastModifiedDate(LocalDateTime.now());
+            repository.save(branch);
+        }
+    }
+
+    public BranchHoliday findHoliday(String id, LocalDate date) {
+        Branch branch = this.findById(id);
+        if (branch == null || branch.getBranchHolidays() == null) {
+            return null;
+        }
+        return branch.getBranchHolidays().stream()
+                .filter(h -> h.getDate().equals(date))
+                .findFirst()
+                .orElse(null);
+    }
 }
